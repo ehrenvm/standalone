@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbell Weight Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles if needed, for now Tailwind should suffice */
+        body {
+            font-family: 'Inter', sans-serif; /* Ensure Inter font is used if Tailwind default changes */
+        }
+        /* Style for radio buttons to make selection clearer */
+        input[type="radio"]:checked + span {
+            font-weight: 600; /* Make selected radio label bold */
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-700 text-gray-100 p-4 md:p-8 min-h-screen flex items-center justify-center">
+    <div class="container mx-auto max-w-2xl bg-slate-800 shadow-2xl rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300 mb-8">
+            Barbell Weight Calculator
+        </h1>
+
+        <div class="space-y-6">
+            <div>
+                <label for="desiredWeight" class="block text-sm font-medium text-sky-300 mb-1">Desired Total Weight (lbs):</label>
+                <input type="number" id="desiredWeight" name="desiredWeight" step="0.5" min="0"
+                       class="mt-1 block w-full px-4 py-3 bg-slate-700 border border-slate-600 text-gray-200 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm placeholder-slate-400"
+                       placeholder="e.g., 135">
+            </div>
+
+            <div>
+                <span class="block text-sm font-medium text-sky-300 mb-2">Bar Weight (lbs):</span>
+                <div class="mt-2 grid grid-cols-2 gap-4">
+                    <label class="flex items-center justify-center p-3 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors has-[:checked]:bg-sky-600 has-[:checked]:border-sky-500">
+                        <input type="radio" name="barWeight" value="45" class="sr-only"> <span class="text-gray-200">45 lbs Bar</span>
+                    </label>
+                    <label class="flex items-center justify-center p-3 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors has-[:checked]:bg-sky-600 has-[:checked]:border-sky-500">
+                        <input type="radio" name="barWeight" value="35" class="sr-only">
+                        <span class="text-gray-200">35 lbs Bar</span>
+                    </label>
+                </div>
+            </div>
+
+            <button id="calculateBtn"
+                    class="w-full bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-opacity-75">
+                Calculate Weights
+            </button>
+        </div>
+
+        <div id="results" class="mt-8 pt-6 border-t border-slate-700">
+            <p class="text-slate-400 text-center">Enter your desired weight and bar type, then click calculate.</p>
+        </div>
+    </div>
+
+    <script>
+        // Event listener for the calculate button
+        document.getElementById('calculateBtn').addEventListener('click', calculateWeights);
+
+        // Main calculation function
+        function calculateWeights() {
+            const desiredWeightInput = document.getElementById('desiredWeight');
+            const barWeightSelected = document.querySelector('input[name="barWeight"]:checked');
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            // --- Input Validation ---
+            const desiredWeight = parseFloat(desiredWeightInput.value);
+            if (isNaN(desiredWeight) || desiredWeight < 0) { // Allow 0 for cases like just the bar
+                resultsDiv.innerHTML = '<p class="text-red-400 text-center">Please enter a valid non-negative desired weight.</p>';
+                return;
+            }
+
+            if (!barWeightSelected) {
+                resultsDiv.innerHTML = '<p class="text-red-400 text-center">Please select a bar weight.</p>';
+                return;
+            }
+            const barWeight = parseFloat(barWeightSelected.value);
+
+            // --- Initialize Variables ---
+            let message = '';
+            let platesPerSideList = []; // Stores the actual plate values (e.g., [45, 10, 2.5])
+            let actualTotalWeight = barWeight;
+            let weightToAddToEachSide = 0;
+            let totalWeightToLoad = 0;
+
+            // --- Logic for Weight Calculation ---
+            if (desiredWeight < barWeight) {
+                message = `<p class="text-center">Desired weight (${desiredWeight} lbs) is less than the bar weight (${barWeight} lbs). Cannot remove weight from the bar. Using bar only.</p>`;
+                actualTotalWeight = barWeight;
+            } else if (desiredWeight === barWeight) {
+                message = `<p class="text-center">Desired weight (${desiredWeight} lbs) matches the bar weight (${barWeight} lbs). No plates needed.</p>`;
+                actualTotalWeight = barWeight;
+            } else { // desiredWeight > barWeight
+                totalWeightToLoad = desiredWeight - barWeight;
+
+                // The total weight to load must be a multiple of 1 lb,
+                // because the smallest pair of plates is 2 * 0.5 lb = 1 lb.
+                // This means weight_per_side will be a multiple of 0.5 lb.
+                if (totalWeightToLoad % 1 !== 0) {
+                    message = `<p class="text-orange-400 text-center">Cannot achieve the exact desired weight of ${desiredWeight} lbs. The additional weight required (${totalWeightToLoad.toFixed(2)} lbs) must be a multiple of 1 lb (as plates are added in pairs, smallest pair is 2 x 0.5 lb = 1 lb). Closest achievable weight with the current bar is ${barWeight} lbs or by adjusting desired weight.</p>`;
+                    actualTotalWeight = barWeight; // Or suggest closest valid weights
+                } else {
+                    // totalWeightToLoad is a multiple of 1, so weightToAddToEachSide is a multiple of 0.5
+                    weightToAddToEachSide = totalWeightToLoad / 2;
+
+                    const availablePlates = [45, 35, 25, 15, 10, 5, 2.5, 1, 0.5];
+                    let remainingWeightPerSide = weightToAddToEachSide;
+                    const epsilon = 1e-9; // For floating point comparisons
+
+                    for (const plate of availablePlates) {
+                        while (remainingWeightPerSide >= plate - epsilon) {
+                            platesPerSideList.push(plate);
+                            remainingWeightPerSide -= plate;
+                        }
+                        if (Math.abs(remainingWeightPerSide) < epsilon) {
+                            remainingWeightPerSide = 0; // Snap to zero if very close
+                            break; // All weight for this side accounted for
+                        }
+                    }
+
+                    // This check should ideally not fail if totalWeightToLoad % 1 === 0
+                    // as any multiple of 0.5 lbs should be formable.
+                    if (Math.abs(remainingWeightPerSide) > epsilon) {
+                        message = `<p class="text-red-400 text-center">Error: Could not make exact change for ${weightToAddToEachSide.toFixed(2)} lbs per side. Remainder: ${remainingWeightPerSide.toFixed(2)} lbs. This usually means the desired weight implies a weight per side that isn't a multiple of 0.5 lbs.</p>`;
+                        // Recalculate actual total based on plates that *were* added before error
+                        let addedWeightFromPlates = 0;
+                        platesPerSideList.forEach(p => addedWeightFromPlates += p);
+                        actualTotalWeight = barWeight + (addedWeightFromPlates * 2);
+                    } else {
+                        message = `<p class="text-green-400 font-semibold text-center">Successfully calculated weights!</p>`;
+                        actualTotalWeight = desiredWeight; // Should be the desired weight
+                    }
+                }
+            }
+
+            // --- Build Output HTML ---
+            let outputHTML = `<div class="bg-slate-700 p-6 rounded-lg shadow-inner space-y-3">`;
+            outputHTML += `${message}`; // Display success or error/info message
+
+            outputHTML += `<p class="text-lg"><strong class="text-sky-300">Bar Weight:</strong> ${barWeight} lbs</p>`;
+
+            if (desiredWeight > barWeight && totalWeightToLoad % 1 === 0 && totalWeightToLoad > 0) {
+                outputHTML += `<p><strong class="text-sky-300">Desired Total Weight:</strong> ${desiredWeight} lbs</p>`;
+                outputHTML += `<p><strong class="text-sky-300">Total Weight to Add to Bar:</strong> ${totalWeightToLoad} lbs</p>`;
+                outputHTML += `<p><strong class="text-sky-300">Weight to Add to Each Side:</strong> ${weightToAddToEachSide.toFixed(2)} lbs</p>`;
+
+                if (platesPerSideList.length > 0) {
+                    outputHTML += `<p class="text-sky-300 font-semibold mt-2">Plates for EACH side:</p><ul class="list-disc list-inside ml-4 space-y-1 text-slate-300">`;
+                    const plateCountsForDisplay = {};
+                    platesPerSideList.forEach(p => {
+                        plateCountsForDisplay[p] = (plateCountsForDisplay[p] || 0) + 1;
+                    });
+
+                    // Display in order of plate size (descending)
+                    [45, 35, 25, 15, 10, 5, 2.5, 1, 0.5].forEach(plateValue => {
+                        if (plateCountsForDisplay[plateValue]) {
+                            outputHTML += `<li>${plateCountsForDisplay[plateValue]} x ${plateValue} lbs</li>`;
+                        }
+                    });
+                    outputHTML += `</ul>`;
+                } else if (weightToAddToEachSide > 0) {
+                    // This case implies weightToAddToEachSide > 0 but no plates could be formed,
+                    // which should be caught by the remainder check.
+                    outputHTML += `<p class="text-orange-400">No standard plate combination found for ${weightToAddToEachSide.toFixed(2)} lbs per side.</p>`;
+                }
+            }
+            // Always show the final achievable weight
+            outputHTML += `<p class="mt-4 text-xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300">Actual Total Weight: ${actualTotalWeight.toFixed(2)} lbs</p>`;
+            outputHTML += `</div>`;
+            resultsDiv.innerHTML = outputHTML;
+        }
+    </script>
+</body>
+</html>
